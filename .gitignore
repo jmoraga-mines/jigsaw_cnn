@@ -1,0 +1,24 @@
+*.o
+*.dSYM
+*.csv
+*.out
+*.png
+*.tif
+*.tiff
+*.model
+*.label.pickle
+*.so
+*.exe
+*.pyc
+*.npy
+data/
+__pycache__/
+old_models/
+old_scripts/
+dataset*/
+*.weights
+
+# OS Generated #
+.DS_Store*
+*.swp
+
