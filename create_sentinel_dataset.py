@@ -13,6 +13,7 @@ import sentinel_tiff as sf
 import cv2
 import skimage.io
 import os
+import argparse
 
 # Default values
 SAMPLES_TO_CREATE = 1200
@@ -27,7 +28,7 @@ def parse_arguments():
                     help="file name of mask (it should have a .png or .tif extension)")
     ap.add_argument("-d", "--directory", required=False,
                     help="path to directory where samples will be written to",
-                    default = DEFAULT_DIRECTORY))
+                    default = DEFAULT_DIRECTORY)
     ap.add_argument("-s", "--samples", required=False, help="number of samples to create",
                     default = SAMPLES_TO_CREATE)
     ap.add_argument("-k", "--kernel_size", required=False,
@@ -36,7 +37,7 @@ def parse_arguments():
     return args
 
 if __name__ == '__main__':
-    args = parse_arguments()
+    args = parse_arguments( )
     image_name = args["image"]
     mask_name = args["mask"]
     output_directory = args["directory"]
