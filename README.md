@@ -21,7 +21,7 @@ Example use:
   ```
   - By default, it will create a dataset from the image and mask, containing 1,200 random samples for each class, with a kernel size of 17x17 pixels
 
-- train the network:
+- Train the network:
   ```
   python jigsaw_cnn.py -d <training_dataset_directory_name> \
                        -m <trained_model_name> \
@@ -31,7 +31,7 @@ Example use:
   ```
   - Using the dataset, creates a trained model by running the model for 200 epochs. Use .png extension for history graph file
 
-- evaluate the network:
+- Evaluate the network:
   ```
   python jigsaw_cnn.py -d <evaluation_dataset_directory_name> \
                        -m <trained_model_name> \
