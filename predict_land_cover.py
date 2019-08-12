@@ -116,7 +116,8 @@ if __name__ == '__main__':
     flat_img = Image.fromarray((flat_img*255).astype(np.uint8))
     print('saving PNG data')
     flat_img.save(mask_name+'.png')
-    print('saving TIF data to:', mask_name)
-    flat_img.save( mask_name+'.tif' )
+    # We can save a lossless TIF, but it is redundant. use .npy instead
+    # print('saving TIF data to:', mask_name)
+    # flat_img.save( mask_name+'.tif' )
 
 
