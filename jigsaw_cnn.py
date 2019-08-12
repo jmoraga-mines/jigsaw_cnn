@@ -3,7 +3,7 @@
 Create Dataset from Sentinel Multispectra TIFFs
 
 Created 2019-06-13
-Updated 209-07-29
+Updated 2019-08-12
 
 @authors: gurbet, jim
 """
@@ -16,11 +16,9 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import AveragePooling2D, Input, Concatenate
 from keras.layers.convolutional import Conv2D, MaxPooling2D
 from keras.layers.core import Activation, Flatten, Dropout, Dense
-# from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.models import load_model
 from keras.optimizers import Adam
-# from keras.preprocessing.image import img_to_array
 from keras.regularizers import l2
 
 import matplotlib
@@ -31,7 +29,6 @@ import os.path as path
 import pickle
 import random
 import skimage
-#import tensorflow as tf
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score 
@@ -74,11 +71,6 @@ class DataGenerator(keras.utils.Sequence):
         'Generate one batch of data'
         # Generate indexes of the batch
         indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
-
-        # Find list of IDs
-        # data_set_temp = [self.data_set[k] for k in indexes]
-        # label_temp = [self.labels[k] for k in indexes]
-
         # Generate data
         X, y = self.__data_generation(indexes)
 
@@ -95,7 +87,6 @@ class DataGenerator(keras.utils.Sequence):
         # Initialization
         X = np.empty((self.batch_size, *self.dim, self.n_channels))
         y = np.empty((self.batch_size, self.n_classes), dtype=int)
-
         # Generate data
         for i, ID in enumerate(list_IDs_temp):
             # Store sample
@@ -110,13 +101,7 @@ class DataGenerator(keras.utils.Sequence):
             X[i,] = image_raw
             # Store class
             y[i] = self.labels[ID]
-        return X, y #keras.utils.to_categorical(y, num_classes=self.n_classes)
-
-def preprocess_input(x):
-    x = np.divide(x, 255.0)   # Normalizes to range 0.0 to 1.0
-    # x = np.subtract(x, 0.5) # Normalizes to range -0.5 to 0.5
-    # x = np.multiply(x, 2.0) # Normalizes to range -1.0 to 1.0
-    return x
+        return X, y
 
 def inception_m( input_net, first_layer = None ):
     conv1 = Conv2D(128, (1,1), padding='same', activation = 'relu', kernel_regularizer = l2(0.0002))(input_net)
@@ -134,7 +119,6 @@ def inception_m( input_net, first_layer = None ):
                                                       inception_t1_7x7, inception_t1_pool_proj])
     else:
         inception_t1_first = Conv2D(96, (1,1), padding='same', activation = 'relu', kernel_regularizer = l2(0.0002))(first_layer)
-        # inception_t1_first = pixel_conv
         inception_t1_output = Concatenate(axis = -1)([inception_t1_first, inception_t1_1x1, inception_t1_3x3,
                                                       inception_t1_5x5, inception_t1_7x7, inception_t1_pool_proj])
     return inception_t1_output
@@ -144,9 +128,7 @@ def inception_m_end( input_net, num_classes = 7, first_layer = None ):
     flat = Flatten()(avg_pooling)
     flat = Dense(16, kernel_regularizer=l2(0.0002))(flat)
     flat = Dropout(0.4)(flat)
-    # flat = Flatten()(input_net)
     if first_layer is not None:
-        # input_pixel = first_layer[:,8,8,:]
         input_pixel = Flatten()(first_layer)
         input_pixel = Dense(16, kernel_regularizer=l2(0.0002))(input_pixel)
         input_pixel = Dropout(0.2)(input_pixel)
@@ -234,7 +216,6 @@ if __name__ == '__main__':
     # initialize the data and labels
     data = []
     labels = []
-
     '''
     Creates the network
     '''
@@ -246,32 +227,19 @@ if __name__ == '__main__':
         inception_01 = inception_m( my_input )
         # Attaches end to inception modules, returns class within num_classes
         loss3_classifier_act = inception_m_end( inception_01, num_classes = num_classes, first_layer = my_input )
-        # loss3_classifier_act = inception_m_end( inception_02, num_classes = 7 )
         
         # Builds model
         model3 = Model( inputs = my_input, outputs = [loss3_classifier_act] )
         model3.summary()
-        ## grab the image paths and randomly shuffle them
     else:
-        '''
-        my_input = Input( shape=IMAGE_DIMS, batch_shape=BATCH_DIMS )
-        
-        # One inception modules 
-        inception_01 = inception_m( my_input )
-        # Attaches end to inception modules, returns class within num_classes
-        loss3_classifier_act = inception_m_end( inception_01, num_classes = num_classes, first_layer = my_input )
-        # loss3_classifier_act = inception_m_end( inception_02, num_classes = 7 )
-        
-        model3 = Model( inputs = my_input, outputs = [loss3_classifier_act] )
-        '''
         # Builds model
         print('[INFO] Loading model from file...')
         model3 = load_model( model_file )
         model3.summary()
     if (not reset_model and (weights_exist and not model_exist)):
         model3.load_weights(weights_file)
+    ## grab the image paths and randomly shuffle them
     print("[INFO] loading images...")
-    #imagePaths = sorted(list(paths.list_images(args["dataset"])))
     imagePaths = sorted(list(paths.list_files(dataset_path)))
     print('Number of images:', len(imagePaths))
     # Ensure 'random' numbers are not too random to compare networks
@@ -283,10 +251,8 @@ if __name__ == '__main__':
     img_count = 0
     for imagePath in imagePaths:
         # Reads image file from dataset
-        # image = skimage.io.imread(imagePath)
         image = np.load(imagePath)
         # Our Model uses (width, height, depth )
-        # image = image.transpose((1,2,0))
         data.append(image)
         # Gets label from subdirectory name and stores it
         label = imagePath.split(os.path.sep)[-2]
@@ -303,26 +269,19 @@ if __name__ == '__main__':
     lb = LabelBinarizer()
     labels = lb.fit_transform(labels)
     
-    # partition the data into training and testing splits using 80% of
-    # the data for training and the remaining 20% for testing
+    # partition the data into training and testing splits using 50% of
+    # the data for training and the remaining 50% for testing
     (trainX, testX, trainY, testY) = train_test_split(data,
         labels, test_size=0.5, random_state=42)
-    
     params = {'dim':(17,17), 'batch_size': BS, 'n_classes': 7, 'n_channels': 12,
             'shuffle': True, 'augment_data': augment_data}
-    
     # construct the image generator for data augmentation
     my_batch_gen = DataGenerator(trainX, trainY, **params)
     print('creating generator with trainX, trainY of shapes: (%s, %s)'%(trainX.shape, trainY.shape))
-    
-    
     ## initialize the model
     print("[INFO] compiling model...")
     print('SmallInception: (depth, width, height, classes) = (%s, %s, %s, %s)' % (IMAGE_DIMS[0], IMAGE_DIMS[1], 
            IMAGE_DIMS[2], len(lb.classes_)))
-    #model = SmallInception.build(width=IMAGE_DIMS[0], height=IMAGE_DIMS[1],
-    #    depth=IMAGE_DIMS[2], classes=len(lb.classes_))
-    
     if (validate_only):
         print("[INFO] Skipping training...")
         print("[INFO] Validate-only model:", validate_only)
@@ -338,6 +297,7 @@ if __name__ == '__main__':
         auto_save = ModelCheckpoint(model_file, monitor = 'val_acc', verbose = 0,
                                     save_best_only = True, save_weights_only=False,
                                     mode='auto', period=10)
+        # can use validation set loss or accuracy to stop early
         # early_stop = EarlyStopping( monitor = 'val_acc', mode='max', baseline=0.97)
         early_stop = EarlyStopping( monitor = 'val_loss', mode='min', verbose=1, patience=50 )
         # train the network
@@ -345,12 +305,9 @@ if __name__ == '__main__':
         # Train the model
         H = model3.fit_generator(
             generator = my_batch_gen,
-            # aug.flow(trainX, trainY, batch_size=BS),
-            #(trainX, trainY, batch_size=BS),
             validation_data=(testX, testY),
             steps_per_epoch=len(trainX) // BS,
             callbacks=[early_stop, auto_save],
-            # callbacks=[auto_save],
             epochs=EPOCHS, verbose=1)
         # save the model to disk
         print("[INFO] serializing network...")
@@ -360,18 +317,12 @@ if __name__ == '__main__':
         f = open(label_file, "wb")
         f.write(pickle.dumps(lb))
         f.close()
-    
     testY = lb.inverse_transform( testY ).astype(np.int64)
-    #1AA
     print('[INFO] Predicting ...')
     pre_y2 = model3.predict(testX, verbose = 1)
     pre_y2 = pre_y2.argmax(axis=-1)+1
     acc2 = accuracy_score(testY, pre_y2)
     print('Accuracy on test set: {0:.3f}'.format(acc2))
-    
-    
-    #gradient boosting 
-    
     print("Confusion Matrix:")
     print(confusion_matrix(testY, pre_y2))
     print()
@@ -382,7 +333,6 @@ if __name__ == '__main__':
         plt.style.use("ggplot")
         plt.figure()
         N = EPOCHS
-        # print('history type: ', type(H.history))
         plt.plot(np.arange(0, N), H.history["loss"], label="train_loss")
         plt.plot(np.arange(0, N), H.history["val_loss"], label="val_loss")
         plt.plot(np.arange(0, N), H.history["acc"], label="train_acc")
