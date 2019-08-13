@@ -32,7 +32,7 @@ import skimage
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score 
-# from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc
 
 matplotlib.use("Agg")
 DEFAULT_WEIGHTS_FILE_NAME = 'new_cnn.weights'
@@ -46,7 +46,16 @@ class2code = {'none': 0,
               'river':4,
               'agricultural':5,
               'clear water':6,
-              'grasland':7}
+              'grassland':7}
+
+code2class = {0: 'none',
+              1: 'mine',
+              2: 'forest',
+              3: 'build_up',
+              4: 'river',
+              5: 'agricultural',
+              6: 'clear water',
+              7: 'grassland'}
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -141,6 +150,63 @@ def inception_m_end( input_net, num_classes = 7, first_layer = None ):
     loss3_classifier_act = Activation('softmax', name='prob')(loss3_classifier)
     return loss3_classifier_act
 
+def ROC_curve_calc( testY, pre_y2, class_num, output_file_header ):
+    ''' 
+    Calculate other stats
+    '''
+    '''
+    code2class = {0: 'none',
+                  1: 'mine',
+                  2: 'forest',
+                  3: 'build_up',
+                  4: 'river',
+                  5: 'agricultural',
+                  6: 'clear water',
+                  7: 'grassland'}
+    '''
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    n_classes=class_num
+    for i in range(1, n_classes):
+        class_plot = i
+        # class_indexes = np.where( testY == i )
+        # print('For testY, shape = ', testY.shape)
+        # print('For testY, first item = ', testY[0])
+        true_labels = (testY[:]==i)
+        pred_probs = (pre_y2[:]==i)
+        if class_plot == 0:
+            pred_probs = pred_probs*0
+            pred_probs = pre_y2_prob[:,0]*0
+        else:
+            pred_probs = pre_y2_prob[:,class_plot-1]
+        print('For class ', i, ': shape = ', true_labels.shape)
+        print('For true_labels, first item = ', true_labels[0])
+        fpr[i], tpr[i], _ = roc_curve( true_labels, pred_probs) # , pos_label = 1)
+        roc_auc[i] = auc(fpr[i], tpr[i])
+        # Compute micro-average ROC curve and area
+        # fpr["micro"], tpr["micro"], _ = roc_curve( testY.ravel(), pre_y2.ravel() )
+        # fpr["micro"], tpr["micro"], _ = roc_curve( testY, pre_y2 )
+        # roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    for i in range(1, n_classes):
+        # Plot for a class
+        class_plot = i
+        class_name = code2class[class_plot]
+        plt.figure()
+        line_width = 2
+        plt.plot( fpr[class_plot], tpr[class_plot], color='darkorange', 
+                  lw = line_width, label = 'ROC Curve for class %s (area = %0.2f)'%( class_name, roc_auc[class_plot] ))
+        plt.plot([0,1], [0, 1], color='navy', lw=line_width, linestyle='--')
+        plt.xlim( [0.0, 1.0] )
+        plt.ylim( [0.0, 1.05] )
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC Curve')
+        plt.legend(loc='lower right')
+        plt.show()
+        plt.savefig(output_file_header+'.'+class_name+'.png')
+    return
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument("-a", "--augment", required=False,
@@ -162,6 +228,8 @@ if __name__ == '__main__':
     ap.add_argument("-r", "--reset", required=False,
                     help="Don't load setup files, train from scratch",
                     dest='reset', action = 'store_true', default = False)
+    ap.add_argument("-o", "--output_curves", required=False, help="Starting file name for ROC curves",
+                    default = None)
     ap.add_argument("-t", "--true_random", required=False,
                     help="Ensure true random shuffling of training and test sets",
                     dest='true_random', action = 'store_true', default = False)
@@ -184,6 +252,7 @@ if __name__ == '__main__':
     true_random = args["true_random"]
     validate_only = args["validate"]
     weights_file = args["weights"]
+    output_curves_file = args["output_curves"]
     if reset_model:
         print("[INFO] Reset model")
         model_exist = False
@@ -246,7 +315,8 @@ if __name__ == '__main__':
     if (not true_random):
         random.seed(42)
     random.shuffle(imagePaths)
-    #
+    # leave just a subset of all images
+    # imagePaths = imagePaths[:1400]
     ## loop over the input images
     img_count = 0
     for imagePath in imagePaths:
@@ -320,6 +390,7 @@ if __name__ == '__main__':
     testY = lb.inverse_transform( testY ).astype(np.int64)
     print('[INFO] Predicting ...')
     pre_y2 = model3.predict(testX, verbose = 1)
+    pre_y2_prob = pre_y2
     pre_y2 = pre_y2.argmax(axis=-1)+1
     acc2 = accuracy_score(testY, pre_y2)
     print('Accuracy on test set: {0:.3f}'.format(acc2))
@@ -328,6 +399,9 @@ if __name__ == '__main__':
     print()
     print("Classification Report")
     print(classification_report(testY, pre_y2))
+    # Calculate ROC Curves if required
+    if output_curves_file is not None:
+        ROC_curve_calc( testY, pre_y2, class_num = 8, output_file_header = output_curves_file)
     if (not validate_only):
         # plot the training loss and accuracy
         plt.style.use("ggplot")
